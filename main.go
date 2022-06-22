@@ -25,11 +25,17 @@ func main() {
 	streamChan := make(chan map[string]interface{})
 
 	// run redis stream reader
-	go streamReader.RedisConsumer(streamChan, config)
+
+	err = tsdbWriter.TimeScaleTableCreator(config)
+	if err != nil {
+		log.Fatal("error creating table ", err)
+	}
 
 	for i := 0; i < config.TimescaleDBWorkers; i++ {
 		go tsdbWriter.TimescaleWriter(streamChan, config)
 	}
+
+	go streamReader.RedisConsumer(streamChan, config)
 
 	<-signalChan
 	log.Println("exiting app")

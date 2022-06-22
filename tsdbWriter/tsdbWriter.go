@@ -2,7 +2,6 @@ package tsdbWriter
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -13,7 +12,8 @@ import (
 	"github.com/jaredmcqueen/quote-writer/util"
 )
 
-func TimescaleWriter(streamChan <-chan map[string]interface{}, config util.Config) {
+func TimeScaleTableCreator(config util.Config) error {
+
 	tableSQL := `
         CREATE TABLE IF NOT EXISTS quotes (
           time TIMESTAMPTZ NOT NULL, 
@@ -30,6 +30,22 @@ func TimescaleWriter(streamChan <-chan map[string]interface{}, config util.Confi
         SELECT create_hypertable('quotes', 'time', chunk_time_interval => 86400000, if_not_exists => TRUE);
         `
 
+	ctx := context.Background()
+	dbpool, err := pgxpool.Connect(ctx, config.TimescaleDBConnection)
+	if err != nil {
+		log.Fatal("cannot connect to TSDB", err)
+	}
+	log.Println("connected to TSDB")
+
+	_, err = dbpool.Exec(ctx, tableSQL)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func TimescaleWriter(streamChan <-chan map[string]interface{}, config util.Config) {
+
 	columns := []string{
 		"time",
 		"symbol",
@@ -43,7 +59,6 @@ func TimescaleWriter(streamChan <-chan map[string]interface{}, config util.Confi
 		"tape",
 	}
 
-	// make table (even if it already exists)
 	ctx := context.Background()
 	dbpool, err := pgxpool.Connect(ctx, config.TimescaleDBConnection)
 	if err != nil {
@@ -51,12 +66,6 @@ func TimescaleWriter(streamChan <-chan map[string]interface{}, config util.Confi
 	}
 	log.Println("connected to TSDB")
 
-	_, err = dbpool.Exec(ctx, tableSQL)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	// for batching
 	timeout := time.Duration(time.Duration(config.TimescaleDBBatchTimeout) * time.Millisecond)
 	timer := time.NewTimer(timeout)
 
@@ -72,8 +81,8 @@ func TimescaleWriter(streamChan <-chan map[string]interface{}, config util.Confi
 	for {
 		select {
 		case <-timer.C:
-			// log.Println("timeout reached at ", len(batch))
 			if len(batch) > 0 {
+				log.Println("timeout reached with ", len(batch))
 				_, err := dbpool.CopyFrom(
 					ctx,
 					pgx.Identifier{"quotes"},
@@ -110,7 +119,7 @@ func TimescaleWriter(streamChan <-chan map[string]interface{}, config util.Confi
 			batch = append(batch, quote)
 
 			if len(batch) == config.TimescaleDBBatchSize {
-				// log.Println("batchsize reached at ", len(batch))
+				log.Println("batchsize reached at ", len(batch))
 				_, err := dbpool.CopyFrom(
 					ctx,
 					pgx.Identifier{"quotes"},
