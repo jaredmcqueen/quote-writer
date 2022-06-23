@@ -2,6 +2,7 @@ package tsdbWriter
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/jaredmcqueen/quote-writer/util"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func TimeScaleTableCreator(config util.Config) error {
@@ -44,7 +46,7 @@ func TimeScaleTableCreator(config util.Config) error {
 	return nil
 }
 
-func TimescaleWriter(streamChan <-chan map[string]interface{}, config util.Config) {
+func TimescaleWriter(id int, streamChan <-chan map[string]interface{}, config util.Config, counter *prometheus.CounterVec) {
 
 	columns := []string{
 		"time",
@@ -78,22 +80,26 @@ func TimescaleWriter(streamChan <-chan map[string]interface{}, config util.Confi
 	var quote []interface{}
 	var batch [][]interface{}
 
+	sendData := func() {
+		_, err := dbpool.CopyFrom(
+			ctx,
+			pgx.Identifier{"quotes"},
+			columns,
+			pgx.CopyFromRows(batch),
+		)
+		if err != nil {
+			fmt.Println("error sending data ", err)
+		}
+		counter.WithLabelValues(fmt.Sprintf("%v", id)).Add(float64(len(batch)))
+		batch = batch[:0]
+	}
+
 	for {
 		select {
 		case <-timer.C:
 			if len(batch) > 0 {
-				log.Println("timeout reached with ", len(batch))
-				_, err := dbpool.CopyFrom(
-					ctx,
-					pgx.Identifier{"quotes"},
-					columns,
-					pgx.CopyFromRows(batch),
-				)
-				if err != nil {
-					log.Fatal("Unexpected error for CopyFrom ", err)
-				}
+				sendData()
 			}
-			batch = batch[:0]
 			timer.Reset(timeout)
 		case t := <-streamChan:
 			timeMilli, _ = strconv.ParseInt(t["t"].(string), 10, 64)
@@ -118,18 +124,8 @@ func TimescaleWriter(streamChan <-chan map[string]interface{}, config util.Confi
 
 			batch = append(batch, quote)
 
-			if len(batch) == config.TimescaleDBBatchSize {
-				log.Println("batchsize reached at ", len(batch))
-				_, err := dbpool.CopyFrom(
-					ctx,
-					pgx.Identifier{"quotes"},
-					columns,
-					pgx.CopyFromRows(batch),
-				)
-				if err != nil {
-					log.Fatal("Unexpected error for CopyFrom ", err)
-				}
-				batch = batch[:0]
+			if len(batch) >= config.TimescaleDBBatchSize {
+				sendData()
 				if !timer.Stop() {
 					<-timer.C
 				}
