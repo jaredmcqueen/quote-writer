@@ -5,31 +5,36 @@ import (
 	"fmt"
 	"log"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jaredmcqueen/quote-writer/streamReader"
 	"github.com/jaredmcqueen/quote-writer/util"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-func TimeScaleTableCreator(config util.Config) error {
+var (
+	config      = util.Config
+	streamChan  = streamReader.StreamChan
+	TSDBCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "quote_writer_tsdb_writes_total",
+		Help: "how many inserts get written to TimescaleDB",
+	}, []string{"worker"})
+)
 
+func TimeScaleTableCreator() error {
 	tableSQL := `
         CREATE TABLE IF NOT EXISTS quotes (
           time TIMESTAMPTZ NOT NULL, 
           symbol VARCHAR, 
-          ask_exchange VARCHAR, 
-          ask_price DOUBLE PRECISION, 
-          ask_size int NOT NULL, 
-          bid_exchange VARCHAR, 
-          bid_price DOUBLE PRECISION, 
-          bid_size int NOT NULL, 
-          conditions VARCHAR ARRAY, 
-          tape VARCHAR
+          high DOUBLE PRECISION, 
+          low DOUBLE PRECISION
         );
-        SELECT create_hypertable('quotes', 'time', chunk_time_interval => 86400000, if_not_exists => TRUE);
+        SELECT create_hypertable(
+            'quotes', 'time', chunk_time_interval => 86400000, if_not_exists => TRUE
+        );
         `
 
 	ctx := context.Background()
@@ -46,19 +51,12 @@ func TimeScaleTableCreator(config util.Config) error {
 	return nil
 }
 
-func TimescaleWriter(id int, streamChan <-chan map[string]interface{}, config util.Config, counter *prometheus.CounterVec) {
-
+func TimescaleWriter(id int) {
 	columns := []string{
 		"time",
 		"symbol",
-		"ask_exchange",
-		"ask_price",
-		"ask_size",
-		"bid_exchange",
-		"bid_price",
-		"bid_size",
-		"conditions",
-		"tape",
+		"high",
+		"low",
 	}
 
 	ctx := context.Background()
@@ -72,11 +70,8 @@ func TimescaleWriter(id int, streamChan <-chan map[string]interface{}, config ut
 	timer := time.NewTimer(timeout)
 
 	var timeMilli int64
-	var askPrice float64
-	var askSize int64
-	var bidPrice float64
-	var bidSize int64
-	var conditions []string
+	var high float64
+	var low float64
 	var quote []interface{}
 	var batch [][]interface{}
 
@@ -90,7 +85,7 @@ func TimescaleWriter(id int, streamChan <-chan map[string]interface{}, config ut
 		if err != nil {
 			fmt.Println("error sending data ", err)
 		}
-		counter.WithLabelValues(fmt.Sprintf("%v", id)).Add(float64(len(batch)))
+		TSDBCounter.WithLabelValues(fmt.Sprintf("%v", id)).Add(float64(len(batch)))
 		batch = batch[:0]
 	}
 
@@ -103,23 +98,14 @@ func TimescaleWriter(id int, streamChan <-chan map[string]interface{}, config ut
 			timer.Reset(timeout)
 		case t := <-streamChan:
 			timeMilli, _ = strconv.ParseInt(t["t"].(string), 10, 64)
-			askPrice, _ = strconv.ParseFloat(t["ap"].(string), 64)
-			askSize, _ = strconv.ParseInt(t["as"].(string), 10, 64)
-			bidPrice, _ = strconv.ParseFloat(t["bp"].(string), 64)
-			bidSize, _ = strconv.ParseInt(t["bs"].(string), 10, 64)
-			conditions = strings.Split(t["c"].(string), "")
+			high, _ = strconv.ParseFloat(t["h"].(string), 64)
+			low, _ = strconv.ParseFloat(t["l"].(string), 64)
 
 			quote = []interface{}{
 				time.UnixMilli(timeMilli),
 				t["S"],
-				t["ax"],
-				askPrice,
-				askSize,
-				t["bx"],
-				bidPrice,
-				bidSize,
-				conditions,
-				t["z"],
+				high,
+				low,
 			}
 
 			batch = append(batch, quote)

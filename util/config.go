@@ -1,8 +1,12 @@
 package util
 
-import "github.com/spf13/viper"
+import (
+	"log"
 
-type Config struct {
+	"github.com/spf13/viper"
+)
+
+type Envars struct {
 	RedisEndpoint           string `mapstructure:"REDIS_ENDPOINT"`
 	RedisStreamStart        string `mapstructure:"REDIS_STREAM_START"`
 	RedisStreamCount        int64  `mapstructure:"REDIS_STREAM_COUNT"`
@@ -12,8 +16,18 @@ type Config struct {
 	TimescaleDBWorkers      int    `mapstructure:"TIMESCALEDB_WORKERS"`
 }
 
+var Config Envars
+
+func init() {
+	var err error
+	Config, err = loadConfig(".")
+	if err != nil {
+		log.Fatal("could not load config", err)
+	}
+}
+
 // LoadConfig loads app.env if it exists and sets envars
-func LoadConfig(path string) (config Config, err error) {
+func loadConfig(path string) (envars Envars, err error) {
 	viper.AddConfigPath(path)
 	viper.SetConfigName("app")
 	viper.SetConfigType("env")
@@ -25,6 +39,6 @@ func LoadConfig(path string) (config Config, err error) {
 		return
 	}
 
-	err = viper.Unmarshal(&config)
+	err = viper.Unmarshal(&envars)
 	return
 }

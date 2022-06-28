@@ -8,9 +8,20 @@ import (
 	"github.com/go-redis/redis/v9"
 	"github.com/jaredmcqueen/quote-writer/util"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-func RedisConsumer(streamChan chan<- map[string]interface{}, config util.Config, counter prometheus.Counter) {
+var (
+	config     = util.Config
+	StreamChan = make(chan map[string]interface{})
+
+	redisCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "quote_writer_redis_reads_total",
+		Help: "total amount of events pulled from redis",
+	})
+)
+
+func RedisConsumer() {
 	ctx := context.Background()
 	log.Println("connecting to redis endpoint", config.RedisEndpoint)
 	rdb := redis.NewClient(&redis.Options{
@@ -44,9 +55,9 @@ func RedisConsumer(streamChan chan<- map[string]interface{}, config util.Config,
 		for _, stream := range items {
 			if stream.Stream == "quotes" {
 				for _, message := range stream.Messages {
-					streamChan <- message.Values
+					StreamChan <- message.Values
 					pit = message.ID
-					counter.Inc()
+					redisCounter.Inc()
 				}
 			}
 		}
