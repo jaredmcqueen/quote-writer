@@ -9,8 +9,8 @@ import (
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
-	"github.com/jaredmcqueen/quote-writer/streamReader"
-	"github.com/jaredmcqueen/quote-writer/util"
+	"github.com/jaredmcqueen/tsdb-writer/streamReader"
+	"github.com/jaredmcqueen/tsdb-writer/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )

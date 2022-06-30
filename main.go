@@ -6,9 +6,9 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/jaredmcqueen/quote-writer/streamReader"
-	"github.com/jaredmcqueen/quote-writer/tsdbWriter"
-	"github.com/jaredmcqueen/quote-writer/util"
+	"github.com/jaredmcqueen/tsdb-writer/streamReader"
+	"github.com/jaredmcqueen/tsdb-writer/tsdbWriter"
+	"github.com/jaredmcqueen/tsdb-writer/util"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 

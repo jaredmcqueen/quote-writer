@@ -19,11 +19,12 @@ type Envars struct {
 var Config Envars
 
 func init() {
-	var err error
-	Config, err = loadConfig(".")
+	config, err := loadConfig(".")
 	if err != nil {
 		log.Fatal("could not load config", err)
 	}
+	Config = config
+
 }
 
 // LoadConfig loads app.env if it exists and sets envars
@@ -31,7 +32,6 @@ func loadConfig(path string) (envars Envars, err error) {
 	viper.AddConfigPath(path)
 	viper.SetConfigName("app")
 	viper.SetConfigType("env")
-
 	viper.AutomaticEnv()
 
 	err = viper.ReadInConfig()

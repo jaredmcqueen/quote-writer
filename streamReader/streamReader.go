@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v9"
-	"github.com/jaredmcqueen/quote-writer/util"
+	"github.com/jaredmcqueen/tsdb-writer/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -51,6 +51,14 @@ func RedisConsumer() {
 			time.Sleep(time.Second * 10)
 			continue
 		}
+
+		// need a bunch of point-in-times here
+
+		// pits := map[string]string{
+		// 	quotes: "0",
+		// 	bars:   "0",
+		// 	trades: "0",
+		// }
 
 		for _, stream := range items {
 			if stream.Stream == "quotes" {
