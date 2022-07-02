@@ -2,30 +2,26 @@ package streamReader
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/go-redis/redis/v9"
 	"github.com/jaredmcqueen/tsdb-writer/util"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 var (
-	config     = util.Config
 	StreamChan = make(chan map[string]interface{})
-
-	redisCounter = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "quote_writer_redis_reads_total",
-		Help: "total amount of events pulled from redis",
-	})
 )
 
+// RedisConsumer reads from multiple streams, keeping point-in-times for each
+// all message.Values are sent to streamChan without modification
 func RedisConsumer() {
 	ctx := context.Background()
-	log.Println("connecting to redis endpoint", config.RedisEndpoint)
+	log.Println("connecting to redis endpoint", util.Config.RedisEndpoint)
 	rdb := redis.NewClient(&redis.Options{
-		Addr: config.RedisEndpoint,
+		Addr: util.Config.RedisEndpoint,
 	})
 
 	// test redis connection
@@ -35,38 +31,37 @@ func RedisConsumer() {
 	}
 	log.Println("connected to redis")
 
-	// create a point in time to start reading the stream
-	pit := config.RedisStreamStart
+	pitMap := make(map[string]string)
+	for _, streamName := range strings.Split(util.Config.RedisStreamNames, " ") {
+		pitMap[streamName] = util.Config.RedisStreamStart
+	}
+
+	newpits := func() []string {
+		streams := []string{}
+		pits := []string{}
+		for s, p := range pitMap {
+			streams = append(streams, s)
+			pits = append(pits, p)
+		}
+		return append(streams, pits...)
+	}
+
 	for {
+		fmt.Println(pitMap)
 		items, err := rdb.XRead(ctx,
 			&redis.XReadArgs{
-				Streams: []string{"quotes", pit},
-				Count:   config.RedisStreamCount,
-				Block:   0,
+				Streams: newpits(),
+				Count:   util.Config.RedisStreamCount,
+				Block:   time.Duration(time.Second),
 			},
 		).Result()
 		if err != nil {
 			log.Println("error XRead: ", err)
-			log.Println("attempting again in 10 seconds")
-			time.Sleep(time.Second * 10)
-			continue
 		}
-
-		// need a bunch of point-in-times here
-
-		// pits := map[string]string{
-		// 	quotes: "0",
-		// 	bars:   "0",
-		// 	trades: "0",
-		// }
-
 		for _, stream := range items {
-			if stream.Stream == "quotes" {
-				for _, message := range stream.Messages {
-					StreamChan <- message.Values
-					pit = message.ID
-					redisCounter.Inc()
-				}
+			for _, message := range stream.Messages {
+				StreamChan <- message.Values
+				pitMap[stream.Stream] = message.ID
 			}
 		}
 	}

@@ -1,1 +1,1 @@
-# quote-writer
+# tsdb-writer

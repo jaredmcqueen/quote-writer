@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
+
 	"os"
 	"os/signal"
 
@@ -18,18 +20,18 @@ func main() {
 	signal.Notify(signalChan, os.Interrupt)
 
 	// table creation needs a single goroutine
-	err := tsdbWriter.TimeScaleTableCreator()
-	if err != nil {
-		log.Fatal("error creating table ", err)
-	}
+	tsdbWriter.TSDBTableCreator()
 
 	// TSDB writer
-	for i := 1; i < util.Config.TimescaleDBWorkers+1; i++ {
-		go tsdbWriter.TimescaleWriter(i)
+	for i := 1; i < util.Config.TSDBWorkers+1; i++ {
+		go tsdbWriter.DBWriter(fmt.Sprintf("worker-%d", i))
 	}
 
-	// redis reader
+	// consumes redis streams
 	go streamReader.RedisConsumer()
+
+	// processes each type of stream
+	go tsdbWriter.ProcessStreams()
 
 	// metrics
 	go func() {

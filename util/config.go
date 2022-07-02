@@ -7,13 +7,15 @@ import (
 )
 
 type Envars struct {
-	RedisEndpoint           string `mapstructure:"REDIS_ENDPOINT"`
-	RedisStreamStart        string `mapstructure:"REDIS_STREAM_START"`
-	RedisStreamCount        int64  `mapstructure:"REDIS_STREAM_COUNT"`
-	TimescaleDBConnection   string `mapstructure:"TIMESCALEDB_CONNECTION"`
-	TimescaleDBBatchSize    int    `mapstructure:"TIMESCALEDB_BATCH_SIZE"`
-	TimescaleDBBatchTimeout int    `mapstructure:"TIMESCALEDB_BATCH_TIMEOUT"`
-	TimescaleDBWorkers      int    `mapstructure:"TIMESCALEDB_WORKERS"`
+	RedisEndpoint    string `mapstructure:"REDIS_ENDPOINT"`
+	RedisStreamCount int64  `mapstructure:"REDIS_STREAM_COUNT"`
+	RedisStreamStart string `mapstructure:"REDIS_STREAM_START"`
+	RedisStreamNames string `mapstructure:"REDIS_STREAM_NAMES"`
+
+	TSDBBatchSize   int    `mapstructure:"TSDB_BATCH_SIZE"`
+	TSDBConnection  string `mapstructure:"TSDB_CONNECTION"`
+	TSDBWorkers     int    `mapstructure:"TSDB_WORKERS"`
+	TSDBatchTimeout int    `mapstructure:"TSDB_BATCH_TIMEOUT"`
 }
 
 var Config Envars
