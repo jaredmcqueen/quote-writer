@@ -2,7 +2,6 @@ package streamReader
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -47,7 +46,6 @@ func RedisConsumer() {
 	}
 
 	for {
-		fmt.Println(pitMap)
 		items, err := rdb.XRead(ctx,
 			&redis.XReadArgs{
 				Streams: newpits(),

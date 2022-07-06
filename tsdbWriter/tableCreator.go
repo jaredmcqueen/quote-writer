@@ -27,20 +27,6 @@ func TSDBTableCreator() {
     );
     `
 
-	quoteSQL := `
-        CREATE TABLE IF NOT EXISTS quotes (
-          time TIMESTAMPTZ, 
-          symbol VARCHAR, 
-          high DOUBLE PRECISION, 
-          low DOUBLE PRECISION
-        );
-        SELECT create_hypertable(
-            'quotes', 
-            'time', 
-            chunk_time_interval => 86400000, 
-            if_not_exists => TRUE
-        );
-    `
 	statusSQL := `
         CREATE TABLE IF NOT EXISTS statuses ( 
             time TIMESTAMPTZ,
@@ -59,22 +45,35 @@ func TSDBTableCreator() {
         );
     `
 
-	tradeSQL := `
-        CREATE TABLE IF NOT EXISTS trades ( 
-            time TIMESTAMPTZ,
-            symbol VARCHAR,
-            price DOUBLE PRECISION,
-            tradeSize int,
-            tradeCondition VARCHAR ARRAY,
-            exchangeCode VARCHAR,
-            tape VARCHAR
-        );
-        SELECT create_hypertable(
-            'trades',
-            'time',
-            chunk_time_interval => 86400000,
-            if_not_exists => TRUE
-        );
+	quotesSQL := `
+    CREATE TABLE IF NOT EXISTS quotes ( 
+        time TIMESTAMPTZ,
+        symbol VARCHAR,
+        high DOUBLE PRECISION,
+        low DOUBLE PRECISION
+    );
+    SELECT create_hypertable(
+        'quotes',
+        'time',
+        chunk_time_interval => 86400000,
+        if_not_exists => TRUE
+    );
+    `
+
+	tradesSQL := `
+    CREATE TABLE IF NOT EXISTS trades ( 
+        time TIMESTAMPTZ,
+        symbol VARCHAR,
+        high DOUBLE PRECISION,
+        low DOUBLE PRECISION,
+        volume int
+    );
+    SELECT create_hypertable(
+        'trades',
+        'time',
+        chunk_time_interval => 86400000,
+        if_not_exists => TRUE
+    );
     `
 
 	ctx := context.Background()
@@ -84,7 +83,7 @@ func TSDBTableCreator() {
 	}
 	log.Println("connected to TSDB")
 
-	for _, sql := range []string{barSQL, quoteSQL, statusSQL, tradeSQL} {
+	for _, sql := range []string{barSQL, statusSQL, quotesSQL, tradesSQL} {
 		_, err := dbpool.Exec(ctx, sql)
 		if err != nil {
 			log.Fatal("error creating table", err, sql)

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v4"
@@ -23,19 +22,21 @@ var (
         INSERT INTO "bars" (time, symbol, high, low, volume) values
         ($1, $2, $3, $4, $5);
     `
-	quoteSQL = `
-        INSERT INTO "quotes" (time, symbol, high, low) values
-        ($1, $2, $3, $4);
-    `
 	statusSQL = `
         INSERT INTO "statuses" (
         time, symbol, status_code, status_message, reason_code, reason_message, tape) values
         ($1, $2, $3, $4, $5, $6, $7);
     `
+	quoteSQL = `
+        INSERT INTO "quotes" (
+        time, symbol, high, low) values
+        ($1, $2, $3, $4);
+    `
+
 	tradeSQL = `
         INSERT INTO "trades" (
-        time, symbol, price, tradeSize, tradeCondition, exchangeCode, tape) values
-        ($1, $2, $3, $4, $5, $6, $7);
+        time, symbol, high, low, volume) values
+        ($1, $2, $3, $4, $5);
     `
 	tsdbCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "tsdb_writer_sql_batch_total",
@@ -66,19 +67,6 @@ func ProcessStreams() {
 				},
 			}
 			tsdbCounter.WithLabelValues(messageType).Inc()
-		case "quotes":
-			dateMilli, _ := strconv.ParseInt(streamMessage["t"].(string), 10, 64)
-			unixTime := time.UnixMilli(dateMilli).Format(time.RFC3339Nano)
-			TSDBChan <- BatchItem{
-				query: quoteSQL,
-				arguments: []interface{}{
-					unixTime,
-					streamMessage["S"],
-					streamMessage["h"],
-					streamMessage["l"],
-				},
-			}
-			tsdbCounter.WithLabelValues(messageType).Inc()
 		case "statuses":
 			dateMilli, _ := strconv.ParseInt(streamMessage["t"].(string), 10, 64)
 			unixTime := time.UnixMilli(dateMilli).Format(time.RFC3339Nano)
@@ -103,11 +91,22 @@ func ProcessStreams() {
 				arguments: []interface{}{
 					unixTime,
 					streamMessage["S"],
-					streamMessage["p"],
-					streamMessage["s"],
-					strings.Split(streamMessage["c"].(string), ""),
-					streamMessage["x"],
-					streamMessage["z"],
+					streamMessage["h"],
+					streamMessage["l"],
+					streamMessage["v"],
+				},
+			}
+			tsdbCounter.WithLabelValues(messageType).Inc()
+		case "quotes":
+			dateMilli, _ := strconv.ParseInt(streamMessage["t"].(string), 10, 64)
+			unixTime := time.UnixMilli(dateMilli).Format(time.RFC3339Nano)
+			TSDBChan <- BatchItem{
+				query: quoteSQL,
+				arguments: []interface{}{
+					unixTime,
+					streamMessage["S"],
+					streamMessage["h"],
+					streamMessage["l"],
 				},
 			}
 			tsdbCounter.WithLabelValues(messageType).Inc()
