@@ -7,15 +7,20 @@ import (
 )
 
 type Envars struct {
-	RedisEndpoint    string `mapstructure:"REDIS_ENDPOINT"`
-	RedisStreamCount int64  `mapstructure:"REDIS_STREAM_COUNT"`
-	RedisStreamStart string `mapstructure:"REDIS_STREAM_START"`
-	RedisStreamNames string `mapstructure:"REDIS_STREAM_NAMES"`
+	RedisStreamsCount    int64  `mapstructure:"REDIS_STREAMS_COUNT"`
+	RedisStreamsEndpoint string `mapstructure:"REDIS_STREAMS_ENDPOINT"`
+	RedisStreamsNames    string `mapstructure:"REDIS_STREAMS_NAMES"`
+	RedisStreamsStart    string `mapstructure:"REDIS_STREAMS_START"`
 
-	TSDBBatchSize   int    `mapstructure:"TSDB_BATCH_SIZE"`
-	TSDBConnection  string `mapstructure:"TSDB_CONNECTION"`
-	TSDBWorkers     int    `mapstructure:"TSDB_WORKERS"`
-	TSDBatchTimeout int    `mapstructure:"TSDB_BATCH_TIMEOUT"`
+	PostgreSQLEnabled  bool   `mapstructure:"POSTGRESQL_ENABLED"`
+	PostgreSQLEndpoint string `mapstructure:"POSTGRESQL_ENDPOINT"`
+
+	RedisTSEnabled  bool   `mapstructure:"REDIS_TS_ENABLED"`
+	RedisTSEndpoint string `mapstructure:"REDIS_TS_ENDPOINT"`
+
+	BatchSize    int `mapstructure:"BATCH_SIZE"`
+	BatchTimeout int `mapstructure:"BATCH_TIMEOUT"`
+	CacheSize    int `mapstructure:"CACHE_SIZE"`
 }
 
 var Config Envars

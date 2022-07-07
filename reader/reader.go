@@ -1,4 +1,4 @@
-package streamReader
+package reader
 
 import (
 	"context"
@@ -11,16 +11,16 @@ import (
 )
 
 var (
-	StreamChan = make(chan map[string]interface{})
+	ReaderChan = make(chan map[string]interface{})
 )
 
-// RedisConsumer reads from multiple streams, keeping point-in-times for each
-// all message.Values are sent to streamChan without modification
-func RedisConsumer() {
+// RedisStreamReader reads from multiple streams, keeping point-in-times for each
+// all message.Values are sent to a channel without modification
+func RedisStreamsReader(pubsub *util.Pubsub) {
 	ctx := context.Background()
-	log.Println("connecting to redis endpoint", util.Config.RedisEndpoint)
+	log.Println("connecting to redis streams endpoint", util.Config.RedisStreamsEndpoint)
 	rdb := redis.NewClient(&redis.Options{
-		Addr: util.Config.RedisEndpoint,
+		Addr: util.Config.RedisStreamsEndpoint,
 	})
 
 	// test redis connection
@@ -31,8 +31,8 @@ func RedisConsumer() {
 	log.Println("connected to redis")
 
 	pitMap := make(map[string]string)
-	for _, streamName := range strings.Split(util.Config.RedisStreamNames, " ") {
-		pitMap[streamName] = util.Config.RedisStreamStart
+	for _, streamName := range strings.Split(util.Config.RedisStreamsNames, " ") {
+		pitMap[streamName] = util.Config.RedisStreamsStart
 	}
 
 	newpits := func() []string {
@@ -49,7 +49,7 @@ func RedisConsumer() {
 		items, err := rdb.XRead(ctx,
 			&redis.XReadArgs{
 				Streams: newpits(),
-				Count:   util.Config.RedisStreamCount,
+				Count:   util.Config.RedisStreamsCount,
 				Block:   time.Duration(time.Second),
 			},
 		).Result()
@@ -58,7 +58,7 @@ func RedisConsumer() {
 		}
 		for _, stream := range items {
 			for _, message := range stream.Messages {
-				StreamChan <- message.Values
+				pubsub.Publish("redis", message.Values)
 				pitMap[stream.Stream] = message.ID
 			}
 		}

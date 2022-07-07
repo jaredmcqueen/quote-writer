@@ -1,16 +1,15 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 
 	"os"
 	"os/signal"
 
-	"github.com/jaredmcqueen/tsdb-writer/streamReader"
-	"github.com/jaredmcqueen/tsdb-writer/tsdbWriter"
+	"github.com/jaredmcqueen/tsdb-writer/reader"
 	"github.com/jaredmcqueen/tsdb-writer/util"
+	"github.com/jaredmcqueen/tsdb-writer/writers"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -19,26 +18,34 @@ func main() {
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt)
 
-	// table creation needs a single goroutine
-	tsdbWriter.TSDBTableCreator()
-
-	// TSDB writer
-	for i := 1; i < util.Config.TSDBWorkers+1; i++ {
-		go tsdbWriter.DBWriter(fmt.Sprintf("worker-%d", i))
+	// create necessary postgreSQL tables
+	if util.Config.PostgreSQLEnabled {
+		err := util.TSDBTableCreator()
+		if err != nil {
+			log.Fatal("error creating postgreSQL tables", err)
+		}
+		log.Println("created postgreSQL tables")
 	}
 
-	// consumes redis streams
-	go streamReader.RedisConsumer()
+	ps := util.NewPubsub()
 
-	// processes each type of stream
-	go tsdbWriter.ProcessStreams()
+	// start up connections to writers
+	if util.Config.PostgreSQLEnabled {
+		go writers.PostgreSQLWriter(ps)
+	}
 
-	// metrics
+	if util.Config.RedisTSEnabled {
+		go writers.RedisTSWriter(ps)
+	}
+
+	go reader.RedisStreamsReader(ps)
+
 	go func() {
 		http.Handle("/metrics", promhttp.Handler())
 		http.ListenAndServe(":9100", nil)
 	}()
 
+	log.Println("ready")
 	<-signalChan
 	log.Println("exiting app")
 }

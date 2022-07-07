@@ -1,18 +1,16 @@
-package tsdbWriter
+package util
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	"github.com/jackc/pgx/v4/pgxpool"
-	"github.com/jaredmcqueen/tsdb-writer/util"
 )
 
-func TSDBTableCreator() {
+func TSDBTableCreator() error {
 
 	barSQL := `
-    CREATE TABLE IF NOT EXISTS bars ( 
+    CREATE TABLE IF NOT EXISTS bars (
         time TIMESTAMPTZ,
         symbol VARCHAR,
         high DOUBLE PRECISION,
@@ -28,7 +26,7 @@ func TSDBTableCreator() {
     `
 
 	statusSQL := `
-        CREATE TABLE IF NOT EXISTS statuses ( 
+        CREATE TABLE IF NOT EXISTS statuses (
             time TIMESTAMPTZ,
             symbol VARCHAR,
             status_code VARCHAR,
@@ -46,7 +44,7 @@ func TSDBTableCreator() {
     `
 
 	quotesSQL := `
-    CREATE TABLE IF NOT EXISTS quotes ( 
+    CREATE TABLE IF NOT EXISTS quotes (
         time TIMESTAMPTZ,
         symbol VARCHAR,
         high DOUBLE PRECISION,
@@ -61,7 +59,7 @@ func TSDBTableCreator() {
     `
 
 	tradesSQL := `
-    CREATE TABLE IF NOT EXISTS trades ( 
+    CREATE TABLE IF NOT EXISTS trades (
         time TIMESTAMPTZ,
         symbol VARCHAR,
         high DOUBLE PRECISION,
@@ -77,17 +75,17 @@ func TSDBTableCreator() {
     `
 
 	ctx := context.Background()
-	dbpool, err := pgxpool.Connect(ctx, util.Config.TSDBConnection)
+	dbpool, err := pgxpool.Connect(ctx, Config.PostgreSQLEndpoint)
 	if err != nil {
-		log.Fatal("cannot connect to TSDB", err)
+		return err
 	}
-	log.Println("connected to TSDB")
+	log.Println("connected to postgreSQL")
 
 	for _, sql := range []string{barSQL, statusSQL, quotesSQL, tradesSQL} {
 		_, err := dbpool.Exec(ctx, sql)
 		if err != nil {
-			log.Fatal("error creating table", err, sql)
+			return err
 		}
-		fmt.Println("created table")
 	}
+	return nil
 }
